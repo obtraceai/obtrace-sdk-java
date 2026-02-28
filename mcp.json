@@ -1,0 +1,10 @@
+{
+  "mcp_version": "1.0",
+  "name": "obtrace-sdk-java",
+  "description": "MCP context metadata for Obtrace Java SDK repository",
+  "resources": [
+    { "id": "readme", "path": "README.md", "description": "Java SDK usage" },
+    { "id": "docs-index", "path": "docs/index.md", "description": "Documentation index" },
+    { "id": "client", "path": "src/main/java/io/obtrace/sdk/core/ObtraceClient.java", "description": "SDK client implementation" }
+  ]
+}

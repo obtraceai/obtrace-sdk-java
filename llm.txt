@@ -1,0 +1,16 @@
+Obtrace SDK Java
+
+Purpose:
+- Java backend SDK for OTLP transport, propagation, and HTTP/framework instrumentation.
+
+Core packages:
+- io.obtrace.sdk.core
+- io.obtrace.sdk.http
+- io.obtrace.sdk.framework
+
+Design principle:
+- Thin SDK, no business logic authority.
+- Ingest/control-plane owns policy and product semantics.
+
+Reference:
+- specs/sdk/universal-contract-v1.md
