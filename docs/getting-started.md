@@ -3,7 +3,7 @@
 ```java
 ObtraceConfig cfg = new ObtraceConfig();
 cfg.apiKey = "<API_KEY>";
-cfg.ingestBaseUrl = "https://injet.obtrace.ai";
+cfg.ingestBaseUrl = "https://inject.obtrace.ai";
 cfg.serviceName = "java-api";
 
 ObtraceClient client = new ObtraceClient(cfg);

@@ -5,7 +5,7 @@ public class Main {
   public static void main(String[] args) {
     ObtraceConfig cfg = new ObtraceConfig();
     cfg.apiKey = "devkey";
-    cfg.ingestBaseUrl = "https://injet.obtrace.ai";
+    cfg.ingestBaseUrl = "https://inject.obtrace.ai";
     cfg.serviceName = "java-example";
     cfg.tenantId = "tenant-dev";
     cfg.projectId = "project-dev";
