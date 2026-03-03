@@ -16,7 +16,6 @@ SDK is thin/dumb.
 ## Install
 
 ```xml
-<!-- Maven dependency placeholder -->
 <dependency>
   <groupId>io.obtrace</groupId>
   <artifactId>obtrace-sdk-java</artifactId>
