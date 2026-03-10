@@ -14,6 +14,7 @@ public class ObtraceConfig {
   public String env;
   public int requestTimeoutMs = 5000;
   public int maxQueueSize = 1000;
+  public boolean validateSemanticMetrics = false;
   public boolean debug = false;
   public Map<String, String> defaultHeaders = new HashMap<>();
 }

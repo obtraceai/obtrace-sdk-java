@@ -39,6 +39,9 @@ public class ObtraceClient {
   }
 
   public synchronized void metric(String name, double value, String unit, ObtraceContext ctx) {
+    if (cfg.validateSemanticMetrics && cfg.debug && !SemanticMetrics.isSemanticMetric(name)) {
+      System.err.printf("[obtrace-sdk-java] non-canonical metric name: %s%n", name);
+    }
     enqueue("/otlp/v1/metrics", OtlpPayloads.metrics(cfg, name, value, unit, ctx));
   }
 
@@ -50,11 +53,24 @@ public class ObtraceClient {
       String statusMessage,
       Map<String, Object> attrs
   ) {
+    return span(name, traceId, spanId, null, statusCode, statusMessage, attrs);
+  }
+
+  public synchronized String[] span(
+      String name,
+      String traceId,
+      String spanId,
+      String parentSpanId,
+      Integer statusCode,
+      String statusMessage,
+      Map<String, Object> attrs
+  ) {
     String t = traceId != null && traceId.length() == 32 ? traceId : Propagation.randomHex(16);
     String s = spanId != null && spanId.length() == 16 ? spanId : Propagation.randomHex(8);
+    String p = parentSpanId != null && parentSpanId.length() == 16 ? parentSpanId : null;
     Instant now = Instant.now();
     long nanos = now.getEpochSecond() * 1_000_000_000L + now.getNano();
-    enqueue("/otlp/v1/traces", OtlpPayloads.spans(cfg, name, t, s, nanos, nanos, statusCode, statusMessage, attrs));
+    enqueue("/otlp/v1/traces", OtlpPayloads.spans(cfg, name, t, s, p, nanos, nanos, statusCode, statusMessage, attrs));
     return new String[]{t, s};
   }
 
