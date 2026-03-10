@@ -52,6 +52,9 @@ Recommended:
 ## Quickstart
 
 ```java
+import io.obtrace.sdk.core.SemanticMetrics;
+import java.util.Map;
+
 ObtraceConfig cfg = new ObtraceConfig();
 cfg.apiKey = "<API_KEY>";
 cfg.ingestBaseUrl = "https://inject.obtrace.ai";
@@ -59,8 +62,19 @@ cfg.serviceName = "java-api";
 
 ObtraceClient client = new ObtraceClient(cfg);
 client.log("info", "started", null);
+client.metric(SemanticMetrics.RUNTIME_CPU_UTILIZATION, 0.41, "1", null);
+client.span("checkout.charge", null, null, null, "", Map.of(
+    "feature.name", "checkout",
+    "payment.provider", "stripe"
+));
 client.flush();
 ```
+
+## Canonical metrics and custom spans
+
+- Use `SemanticMetrics.*` for globally normalized metric names.
+- Custom spans use `client.span(..., attrs)` and should carry business detail in attributes.
+- Keep free-form metric names only for application-specific signals outside the shared catalog.
 
 ## Frameworks and HTTP
 

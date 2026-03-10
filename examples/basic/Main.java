@@ -1,5 +1,8 @@
 import io.obtrace.sdk.core.ObtraceClient;
+import io.obtrace.sdk.core.SemanticMetrics;
 import io.obtrace.sdk.model.ObtraceConfig;
+
+import java.util.Map;
 
 public class Main {
   public static void main(String[] args) {
@@ -15,8 +18,11 @@ public class Main {
 
     ObtraceClient client = new ObtraceClient(cfg);
     client.log("info", "java sdk initialized", null);
-    client.metric("java.example.metric", 1, "1", null);
-    client.span("java.example.span", null, null, null, "", null);
+    client.metric(SemanticMetrics.RUNTIME_CPU_UTILIZATION, 0.41, "1", null);
+    client.span("checkout.charge", null, null, null, "", Map.of(
+        "feature.name", "checkout",
+        "payment.provider", "stripe"
+    ));
     client.flush();
   }
 }
