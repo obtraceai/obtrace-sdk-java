@@ -72,6 +72,7 @@ public final class OtlpPayloads {
       String name,
       String traceId,
       String spanId,
+      String parentSpanId,
       long startNanos,
       long endNanos,
       Integer statusCode,
@@ -83,6 +84,9 @@ public final class OtlpPayloads {
     Map<String, Object> span = new HashMap<>();
     span.put("traceId", traceId);
     span.put("spanId", spanId);
+    if (parentSpanId != null && !parentSpanId.isBlank()) {
+      span.put("parentSpanId", parentSpanId);
+    }
     span.put("name", name);
     span.put("kind", 3);
     span.put("startTimeUnixNano", String.valueOf(startNanos));
