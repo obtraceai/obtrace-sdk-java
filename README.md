@@ -42,7 +42,7 @@ Required:
 - `ingestBaseUrl`
 - `serviceName`
 
-Recommended:
+Optional (auto-resolved from API key on the server side):
 - `tenantId`
 - `projectId`
 - `appId`
@@ -50,6 +50,23 @@ Recommended:
 - `serviceVersion`
 
 ## Quickstart
+
+### Simplified setup
+
+The API key resolves `tenant_id`, `project_id`, `app_id`, and `env` automatically on the server side, so only three fields are needed:
+
+```java
+ObtraceConfig cfg = new ObtraceConfig();
+cfg.apiKey = "obt_live_...";
+cfg.ingestBaseUrl = "https://ingest.obtrace.io";
+cfg.serviceName = "my-service";
+
+ObtraceClient client = new ObtraceClient(cfg);
+```
+
+### Full configuration
+
+For advanced use cases you can override the resolved values explicitly:
 
 ```java
 import io.obtrace.sdk.core.SemanticMetrics;
