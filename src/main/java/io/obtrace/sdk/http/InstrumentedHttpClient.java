@@ -12,14 +12,26 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
-public class InstrumentedHttpClient {
+public class InstrumentedHttpClient implements AutoCloseable {
   private final ObtraceClient client;
   private final HttpClient http;
+  private final ExecutorService executor;
 
   public InstrumentedHttpClient(ObtraceClient client) {
     this.client = client;
-    this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
+    this.executor = Executors.newCachedThreadPool(r -> {
+      Thread t = new Thread(r, "obtrace-instrumented-http");
+      t.setDaemon(true);
+      return t;
+    });
+    this.http = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(5))
+        .executor(executor)
+        .build();
   }
 
   public HttpResponse<String> send(String method, String url, String body, Map<String, String> headers) throws IOException, InterruptedException {
@@ -65,6 +77,19 @@ public class InstrumentedHttpClient {
       ctx.attrs.put("duration_ms", durMs);
       client.log("error", "java http request failed: " + ex.getMessage(), ctx);
       throw ex;
+    }
+  }
+
+  @Override
+  public void close() {
+    executor.shutdown();
+    try {
+      if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+        executor.shutdownNow();
+      }
+    } catch (InterruptedException e) {
+      executor.shutdownNow();
+      Thread.currentThread().interrupt();
     }
   }
 }
