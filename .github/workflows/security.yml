@@ -22,4 +22,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Install Maven
+        run: which mvn || (sudo apt-get update -qq && sudo apt-get install -yqq maven)
       - run: mvn -q -DskipTests org.owasp:dependency-check-maven:check
