@@ -23,5 +23,10 @@ jobs:
           distribution: temurin
           java-version: '21'
       - name: Install Maven
-        run: which mvn || (sudo apt-get update -qq && sudo apt-get install -yqq maven)
+        run: |
+          which mvn && exit 0
+          MVN_VER=3.9.9
+          wget -q "https://archive.apache.org/dist/maven/maven-3/${MVN_VER}/binaries/apache-maven-${MVN_VER}-bin.tar.gz"
+          tar xzf "apache-maven-${MVN_VER}-bin.tar.gz"
+          echo "${PWD}/apache-maven-${MVN_VER}/bin" >> "$GITHUB_PATH"
       - run: mvn -q -DskipTests org.owasp:dependency-check-maven:check
