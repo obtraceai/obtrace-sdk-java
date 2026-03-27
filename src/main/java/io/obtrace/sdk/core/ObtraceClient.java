@@ -27,6 +27,7 @@ public class ObtraceClient implements AutoCloseable {
   private final ObjectMapper mapper = new ObjectMapper();
   private final List<Queued> queue = new ArrayList<>();
   private volatile boolean closed = false;
+  private final JulHandler julHandler;
   private int circuitFailures = 0;
   private long circuitOpenUntil = 0;
 
@@ -48,6 +49,9 @@ public class ObtraceClient implements AutoCloseable {
         .connectTimeout(Duration.ofMillis(cfg.requestTimeoutMs > 0 ? cfg.requestTimeoutMs : 5000))
         .executor(executor)
         .build();
+
+    this.julHandler = new JulHandler(this);
+    this.julHandler.install();
 
     if (cfg.registerShutdownHook) {
       Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "obtrace-shutdown"));
@@ -159,6 +163,7 @@ public class ObtraceClient implements AutoCloseable {
   public void close() {
     if (closed) return;
     closed = true;
+    julHandler.uninstall();
     executor.shutdown();
     try {
       if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
