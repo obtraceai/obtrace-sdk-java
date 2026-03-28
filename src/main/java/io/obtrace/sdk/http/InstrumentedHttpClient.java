@@ -27,71 +27,85 @@ import javax.net.ssl.SSLParameters;
 
 public class InstrumentedHttpClient extends HttpClient implements AutoCloseable {
   private final Tracer tracer;
-  private final HttpClient delegate;
-  private final ExecutorService ownedExecutor;
+  private volatile HttpClient delegate;
+  private volatile ExecutorService ownedExecutor;
+  private final boolean lazyInit;
 
   public InstrumentedHttpClient(ObtraceClient obtraceClient) {
     this.tracer = obtraceClient.getTracer();
-    this.ownedExecutor = Executors.newCachedThreadPool(r -> {
-      Thread t = new Thread(r, "obtrace-instrumented-http");
-      t.setDaemon(true);
-      return t;
-    });
-    this.delegate = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofSeconds(5))
-        .executor(ownedExecutor)
-        .build();
+    this.lazyInit = true;
   }
 
   public InstrumentedHttpClient(ObtraceClient obtraceClient, HttpClient delegate) {
     this.tracer = obtraceClient.getTracer();
     this.delegate = delegate;
     this.ownedExecutor = null;
+    this.lazyInit = false;
+  }
+
+  private HttpClient getDelegate() {
+    if (delegate == null && lazyInit) {
+      synchronized (this) {
+        if (delegate == null) {
+          ExecutorService exec = Executors.newCachedThreadPool(r -> {
+            Thread t = new Thread(r, "obtrace-instrumented-http");
+            t.setDaemon(true);
+            return t;
+          });
+          this.ownedExecutor = exec;
+          this.delegate = HttpClient.newBuilder()
+              .connectTimeout(Duration.ofSeconds(5))
+              .executor(exec)
+              .build();
+        }
+      }
+    }
+    return delegate;
   }
 
   @Override
   public Optional<CookieHandler> cookieHandler() {
-    return delegate.cookieHandler();
+    return getDelegate().cookieHandler();
   }
 
   @Override
   public Optional<Duration> connectTimeout() {
-    return delegate.connectTimeout();
+    return getDelegate().connectTimeout();
   }
 
   @Override
   public Redirect followRedirects() {
-    return delegate.followRedirects();
+    return getDelegate().followRedirects();
   }
 
   @Override
   public Optional<ProxySelector> proxy() {
-    return delegate.proxy();
+    return getDelegate().proxy();
   }
 
   @Override
   public SSLContext sslContext() {
-    return delegate.sslContext();
+    return getDelegate().sslContext();
   }
 
   @Override
   public SSLParameters sslParameters() {
-    return delegate.sslParameters();
+    return getDelegate().sslParameters();
   }
 
   @Override
   public Optional<Authenticator> authenticator() {
-    return delegate.authenticator();
+    return getDelegate().authenticator();
   }
 
   @Override
   public Version version() {
-    return delegate.version();
+    return getDelegate().version();
   }
 
   @Override
   public Optional<Executor> executor() {
-    return delegate.executor();
+    return getDelegate().executor();
   }
 
   @Override
@@ -107,7 +121,7 @@ public class InstrumentedHttpClient extends HttpClient implements AutoCloseable 
         .startSpan();
 
     try (Scope ignored = span.makeCurrent()) {
-      HttpResponse<T> res = delegate.send(request, responseBodyHandler);
+      HttpResponse<T> res = getDelegate().send(request, responseBodyHandler);
       span.setAttribute("http.status_code", (long) res.statusCode());
       if (res.statusCode() >= 400) {
         span.setStatus(StatusCode.ERROR, "HTTP " + res.statusCode());
@@ -141,8 +155,8 @@ public class InstrumentedHttpClient extends HttpClient implements AutoCloseable 
         .startSpan();
 
     CompletableFuture<HttpResponse<T>> future = pushPromiseHandler != null
-        ? delegate.sendAsync(request, responseBodyHandler, pushPromiseHandler)
-        : delegate.sendAsync(request, responseBodyHandler);
+        ? getDelegate().sendAsync(request, responseBodyHandler, pushPromiseHandler)
+        : getDelegate().sendAsync(request, responseBodyHandler);
 
     return future.whenComplete((res, ex) -> {
       if (ex != null) {
