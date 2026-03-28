@@ -17,6 +17,7 @@ import io.opentelemetry.context.Context;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.Map;
 
 public class ObtraceClient implements AutoCloseable {
@@ -47,6 +48,24 @@ public class ObtraceClient implements AutoCloseable {
     if (cfg.registerShutdownHook()) {
       Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "obtrace-shutdown"));
     }
+  }
+
+  public static Map<String, String> otelEnvironmentVars(ObtraceConfig config) {
+    if (config.apiKey() == null || config.apiKey().isBlank()) throw new IllegalArgumentException("apiKey required");
+    if (config.ingestBaseUrl() == null || config.ingestBaseUrl().isBlank()) throw new IllegalArgumentException("ingestBaseUrl required");
+    if (config.serviceName() == null || config.serviceName().isBlank()) throw new IllegalArgumentException("serviceName required");
+
+    String endpoint = config.ingestBaseUrl();
+    if (endpoint.endsWith("/")) {
+      endpoint = endpoint.substring(0, endpoint.length() - 1);
+    }
+
+    Map<String, String> vars = new HashMap<>();
+    vars.put("OTEL_EXPORTER_OTLP_ENDPOINT", endpoint);
+    vars.put("OTEL_EXPORTER_OTLP_HEADERS", "Authorization=Bearer " + config.apiKey());
+    vars.put("OTEL_SERVICE_NAME", config.serviceName());
+    vars.put("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf");
+    return Map.copyOf(vars);
   }
 
   public InstrumentedHttpClient getHttpClient() {

@@ -49,6 +49,48 @@ Optional (auto-resolved from API key on the server side):
 - `env`
 - `serviceVersion`
 
+## Zero-Config (Java Agent)
+
+For full auto-instrumentation (JDBC, Spring, Kafka, gRPC, OkHttp, and more), use the OpenTelemetry Java agent pointed at Obtrace. No SDK code required:
+
+```bash
+# Download the agent once
+curl -Lo opentelemetry-javaagent.jar \
+  https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
+
+# Run your application with auto-instrumentation
+java -javaagent:opentelemetry-javaagent.jar \
+  -Dotel.exporter.otlp.endpoint=https://ingest.obtrace.ai \
+  -Dotel.exporter.otlp.headers="Authorization=Bearer obt_live_..." \
+  -Dotel.service.name=my-service \
+  -Dotel.exporter.otlp.protocol=http/protobuf \
+  -jar my-app.jar
+```
+
+Or generate the JVM args programmatically:
+
+```java
+String args = ObtraceAgentConfig.jvmArgs(
+    "obt_live_...",
+    "https://ingest.obtrace.ai",
+    "my-service"
+);
+```
+
+Or get the equivalent environment variables from a config object:
+
+```java
+ObtraceConfig cfg = ObtraceConfig.builder()
+    .apiKey("obt_live_...")
+    .ingestBaseUrl("https://ingest.obtrace.ai")
+    .serviceName("my-service")
+    .build();
+
+Map<String, String> env = ObtraceClient.otelEnvironmentVars(cfg);
+// OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_EXPORTER_OTLP_HEADERS,
+// OTEL_SERVICE_NAME, OTEL_EXPORTER_OTLP_PROTOCOL
+```
+
 ## Quickstart
 
 ### Simplified setup
@@ -56,10 +98,11 @@ Optional (auto-resolved from API key on the server side):
 The API key resolves `tenant_id`, `project_id`, `app_id`, and `env` automatically on the server side, so only three fields are needed:
 
 ```java
-ObtraceConfig cfg = new ObtraceConfig();
-cfg.apiKey = "obt_live_...";
-cfg.ingestBaseUrl = "https://ingest.obtrace.io";
-cfg.serviceName = "my-service";
+ObtraceConfig cfg = ObtraceConfig.builder()
+    .apiKey("obt_live_...")
+    .ingestBaseUrl("https://ingest.obtrace.ai")
+    .serviceName("my-service")
+    .build();
 
 ObtraceClient client = new ObtraceClient(cfg);
 ```
@@ -72,10 +115,11 @@ For advanced use cases you can override the resolved values explicitly:
 import io.obtrace.sdk.core.SemanticMetrics;
 import java.util.Map;
 
-ObtraceConfig cfg = new ObtraceConfig();
-cfg.apiKey = "<API_KEY>";
-cfg.ingestBaseUrl = "https://inject.obtrace.ai";
-cfg.serviceName = "java-api";
+ObtraceConfig cfg = ObtraceConfig.builder()
+    .apiKey("<API_KEY>")
+    .ingestBaseUrl("https://ingest.obtrace.ai")
+    .serviceName("java-api")
+    .build();
 
 ObtraceClient client = new ObtraceClient(cfg);
 client.log("info", "started", null);
