@@ -56,6 +56,10 @@ jobs:
           server-password: MAVEN_PASSWORD
           gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
+      - name: Install Maven
+        run: |
+          curl -fsSL https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz | tar xz -C /tmp
+          echo "/tmp/apache-maven-3.9.9/bin" >> "$GITHUB_PATH"
       - name: Set version
         run: mvn versions:set -DnewVersion=${GITHUB_REF_NAME#v} -DgenerateBackupPoms=false
       - run: mvn clean deploy -DskipTests
