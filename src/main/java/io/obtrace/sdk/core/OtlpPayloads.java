@@ -107,14 +107,14 @@ public final class OtlpPayloads {
 
   private static List<Map<String, Object>> resource(ObtraceConfig cfg) {
     Map<String, Object> base = new HashMap<>();
-    base.put("service.name", cfg.serviceName);
-    base.put("service.version", cfg.serviceVersion == null ? "0.0.0" : cfg.serviceVersion);
-    base.put("deployment.environment", cfg.env == null ? "dev" : cfg.env);
+    base.put("service.name", cfg.serviceName());
+    base.put("service.version", cfg.serviceVersion() == null ? "0.0.0" : cfg.serviceVersion());
+    base.put("deployment.environment", cfg.env() == null ? "dev" : cfg.env());
     base.put("runtime.name", "java");
-    if (cfg.tenantId != null) base.put("obtrace.tenant_id", cfg.tenantId);
-    if (cfg.projectId != null) base.put("obtrace.project_id", cfg.projectId);
-    if (cfg.appId != null) base.put("obtrace.app_id", cfg.appId);
-    if (cfg.env != null) base.put("obtrace.env", cfg.env);
+    if (cfg.tenantId() != null) base.put("obtrace.tenant_id", cfg.tenantId());
+    if (cfg.projectId() != null) base.put("obtrace.project_id", cfg.projectId());
+    if (cfg.appId() != null) base.put("obtrace.app_id", cfg.appId());
+    if (cfg.env() != null) base.put("obtrace.env", cfg.env());
     return attrs(base);
   }
 

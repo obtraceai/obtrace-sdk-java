@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 
 public final class JulHandler extends Handler {
   private final ObtraceClient client;
+  private volatile boolean installed = false;
 
   JulHandler(ObtraceClient client) {
     this.client = client;
@@ -25,10 +26,14 @@ public final class JulHandler extends Handler {
   public void close() {}
 
   void install() {
+    if (installed) return;
+    installed = true;
     Logger.getLogger("").addHandler(this);
   }
 
   void uninstall() {
+    if (!installed) return;
+    installed = false;
     Logger.getLogger("").removeHandler(this);
   }
 

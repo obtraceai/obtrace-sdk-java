@@ -6,15 +6,16 @@ import java.util.Map;
 
 public class Main {
   public static void main(String[] args) {
-    ObtraceConfig cfg = new ObtraceConfig();
-    cfg.apiKey = "devkey";
-    cfg.ingestBaseUrl = "https://inject.obtrace.ai";
-    cfg.serviceName = "java-example";
-    cfg.tenantId = "tenant-dev";
-    cfg.projectId = "project-dev";
-    cfg.appId = "java";
-    cfg.env = "dev";
-    cfg.debug = true;
+    ObtraceConfig cfg = ObtraceConfig.builder()
+        .apiKey("devkey")
+        .ingestBaseUrl("https://inject.obtrace.ai")
+        .serviceName("java-example")
+        .tenantId("tenant-dev")
+        .projectId("project-dev")
+        .appId("java")
+        .env("dev")
+        .debug(true)
+        .build();
 
     ObtraceClient client = new ObtraceClient(cfg);
     client.log("info", "java sdk initialized", null);

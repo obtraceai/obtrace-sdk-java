@@ -1,6 +1,7 @@
 package io.obtrace.sdk.core;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.obtrace.sdk.http.InstrumentedHttpClient;
 import io.obtrace.sdk.model.ObtraceConfig;
 import io.obtrace.sdk.model.ObtraceContext;
 
@@ -28,34 +29,41 @@ public class ObtraceClient implements AutoCloseable {
   private final List<Queued> queue = new ArrayList<>();
   private volatile boolean closed = false;
   private final JulHandler julHandler;
+  private final InstrumentedHttpClient instrumentedHttpClient;
   private int circuitFailures = 0;
   private long circuitOpenUntil = 0;
 
   private record Queued(String endpoint, Map<String, Object> payload) {}
 
   public ObtraceClient(ObtraceConfig cfg) {
-    if (cfg.apiKey == null || cfg.apiKey.isBlank()) throw new IllegalArgumentException("apiKey required");
-    if (cfg.ingestBaseUrl == null || cfg.ingestBaseUrl.isBlank()) throw new IllegalArgumentException("ingestBaseUrl required");
-    if (cfg.serviceName == null || cfg.serviceName.isBlank()) throw new IllegalArgumentException("serviceName required");
+    if (cfg.apiKey() == null || cfg.apiKey().isBlank()) throw new IllegalArgumentException("apiKey required");
+    if (cfg.ingestBaseUrl() == null || cfg.ingestBaseUrl().isBlank()) throw new IllegalArgumentException("ingestBaseUrl required");
+    if (cfg.serviceName() == null || cfg.serviceName().isBlank()) throw new IllegalArgumentException("serviceName required");
 
     this.cfg = cfg;
-    this.defaultHeaders = Collections.unmodifiableMap(new java.util.HashMap<>(cfg.getDefaultHeaders()));
+    this.defaultHeaders = cfg.defaultHeaders();
     this.executor = Executors.newSingleThreadExecutor(r -> {
       Thread t = new Thread(r, "obtrace-http");
       t.setDaemon(true);
       return t;
     });
     this.http = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofMillis(cfg.requestTimeoutMs > 0 ? cfg.requestTimeoutMs : 5000))
+        .connectTimeout(Duration.ofMillis(cfg.requestTimeoutMs() > 0 ? cfg.requestTimeoutMs() : 5000))
         .executor(executor)
         .build();
+
+    this.instrumentedHttpClient = new InstrumentedHttpClient(this);
 
     this.julHandler = new JulHandler(this);
     this.julHandler.install();
 
-    if (cfg.registerShutdownHook) {
+    if (cfg.registerShutdownHook()) {
       Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "obtrace-shutdown"));
     }
+  }
+
+  public InstrumentedHttpClient getHttpClient() {
+    return instrumentedHttpClient;
   }
 
   private static String truncate(String s, int max) {
@@ -68,7 +76,7 @@ public class ObtraceClient implements AutoCloseable {
   }
 
   public synchronized void metric(String name, double value, String unit, ObtraceContext ctx) {
-    if (cfg.validateSemanticMetrics && cfg.debug && !SemanticMetrics.isSemanticMetric(name)) {
+    if (cfg.validateSemanticMetrics() && cfg.debug() && !SemanticMetrics.isSemanticMetric(name)) {
       System.err.printf("[obtrace-sdk-java] non-canonical metric name: %s%n", name);
     }
     enqueue("/otlp/v1/metrics", OtlpPayloads.metrics(cfg, truncate(name, 1024), value, unit, ctx));
@@ -129,14 +137,14 @@ public class ObtraceClient implements AutoCloseable {
       batch = new ArrayList<>(queue);
       queue.clear();
     }
-    long deadline = System.currentTimeMillis() + (cfg.flushTimeoutMs > 0 ? cfg.flushTimeoutMs : 30000);
+    long deadline = System.currentTimeMillis() + (cfg.flushTimeoutMs() > 0 ? cfg.flushTimeoutMs() : 30000);
     for (Queued q : batch) {
       if (System.currentTimeMillis() >= deadline) {
-        System.err.printf("[obtrace-sdk-java] flush timeout after %dms, %d items unsent%n", cfg.flushTimeoutMs, batch.size() - batch.indexOf(q));
+        System.err.printf("[obtrace-sdk-java] flush timeout after %dms, %d items unsent%n", cfg.flushTimeoutMs(), batch.size() - batch.indexOf(q));
         break;
       }
       if (send(q)) {
-        if (circuitFailures > 0 && cfg.debug) {
+        if (circuitFailures > 0 && cfg.debug()) {
           System.err.println("[obtrace-sdk-java] circuit breaker closed");
         }
         circuitFailures = 0;
@@ -145,7 +153,7 @@ public class ObtraceClient implements AutoCloseable {
         circuitFailures++;
         if (circuitFailures >= 5) {
           circuitOpenUntil = System.currentTimeMillis() + 30000;
-          if (cfg.debug) {
+          if (cfg.debug()) {
             System.err.println("[obtrace-sdk-java] circuit breaker opened");
           }
           break;
@@ -164,6 +172,7 @@ public class ObtraceClient implements AutoCloseable {
     if (closed) return;
     closed = true;
     julHandler.uninstall();
+    instrumentedHttpClient.close();
     executor.shutdown();
     try {
       if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
@@ -176,7 +185,7 @@ public class ObtraceClient implements AutoCloseable {
   }
 
   private void enqueue(String endpoint, Map<String, Object> payload) {
-    int max = cfg.maxQueueSize > 0 ? cfg.maxQueueSize : 1000;
+    int max = cfg.maxQueueSize() > 0 ? cfg.maxQueueSize() : 1000;
     if (queue.size() >= max) {
       queue.remove(0);
       System.err.printf("[obtrace-sdk-java] queue full (%d), dropping oldest telemetry item%n", max);
@@ -188,9 +197,9 @@ public class ObtraceClient implements AutoCloseable {
     try {
       String json = mapper.writeValueAsString(q.payload);
       HttpRequest.Builder b = HttpRequest.newBuilder()
-          .uri(URI.create(cfg.ingestBaseUrl.replaceAll("/$", "") + q.endpoint))
-          .timeout(Duration.ofMillis(cfg.requestTimeoutMs > 0 ? cfg.requestTimeoutMs : 5000))
-          .header("Authorization", "Bearer " + cfg.apiKey)
+          .uri(URI.create(cfg.ingestBaseUrl().replaceAll("/$", "") + q.endpoint))
+          .timeout(Duration.ofMillis(cfg.requestTimeoutMs() > 0 ? cfg.requestTimeoutMs() : 5000))
+          .header("Authorization", "Bearer " + cfg.apiKey())
           .header("Content-Type", "application/json");
       for (Map.Entry<String, String> h : defaultHeaders.entrySet()) {
         b.header(h.getKey(), h.getValue());
@@ -198,7 +207,7 @@ public class ObtraceClient implements AutoCloseable {
       HttpRequest req = b.POST(HttpRequest.BodyPublishers.ofString(json)).build();
       HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
       if (res.statusCode() >= 300) {
-        if (cfg.debug) {
+        if (cfg.debug()) {
           System.err.printf("[obtrace-sdk-java] status=%d endpoint=%s body=%s%n", res.statusCode(), q.endpoint, res.body());
         }
         return false;
@@ -208,7 +217,7 @@ public class ObtraceClient implements AutoCloseable {
       Thread.currentThread().interrupt();
       return false;
     } catch (IOException e) {
-      if (cfg.debug) {
+      if (cfg.debug()) {
         System.err.printf("[obtrace-sdk-java] send failed endpoint=%s err=%s%n", q.endpoint, e.getMessage());
       }
       return false;
