@@ -66,6 +66,10 @@ public class ObtraceClient implements AutoCloseable {
     return instrumentedHttpClient;
   }
 
+  public InstrumentedHttpClient wrapHttpClient(java.net.http.HttpClient client) {
+    return new InstrumentedHttpClient(this, client);
+  }
+
   private static String truncate(String s, int max) {
     if (s == null || s.length() <= max) return s;
     return s.substring(0, max) + "...[truncated]";
