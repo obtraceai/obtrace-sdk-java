@@ -19,7 +19,7 @@ SDK is thin/dumb.
 <dependency>
   <groupId>io.obtrace</groupId>
   <artifactId>obtrace-sdk-java</artifactId>
-  <version>1.0.0</version>
+  <version>1.0.2</version>
 </dependency>
 ```
 

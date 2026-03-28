@@ -19,8 +19,11 @@ import io.opentelemetry.sdk.OpenTelemetrySdk;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ObtraceClient implements AutoCloseable {
+  private static final AtomicBoolean INSTANCE_CREATED = new AtomicBoolean(false);
   private final ObtraceConfig cfg;
   private final OpenTelemetrySdk sdk;
   private final Tracer tracer;
@@ -28,9 +31,13 @@ public class ObtraceClient implements AutoCloseable {
   private final Logger logger;
   private final InstrumentedHttpClient instrumentedHttpClient;
   private final JulHandler julHandler;
-  private volatile boolean closed = false;
+  private final AtomicBoolean closed = new AtomicBoolean(false);
+  private final ConcurrentHashMap<String, Object> gaugeCache = new ConcurrentHashMap<>();
 
   public ObtraceClient(ObtraceConfig cfg) {
+    if (!INSTANCE_CREATED.compareAndSet(false, true)) {
+      System.err.println("[obtrace-sdk-java] WARNING: ObtraceClient created more than once. Use a single instance.");
+    }
     if (cfg.apiKey() == null || cfg.apiKey().isBlank()) throw new IllegalArgumentException("apiKey required");
     if (cfg.ingestBaseUrl() == null || cfg.ingestBaseUrl().isBlank()) throw new IllegalArgumentException("ingestBaseUrl required");
     if (cfg.serviceName() == null || cfg.serviceName().isBlank()) throw new IllegalArgumentException("serviceName required");
@@ -129,9 +136,11 @@ public class ObtraceClient implements AutoCloseable {
         putAttribute(ab, e.getKey(), e.getValue());
       }
     }
-    meter.gaugeBuilder(truncatedName)
-        .setUnit(unit == null || unit.isBlank() ? "1" : unit)
-        .buildWithCallback(measurement -> measurement.record(value, ab.build()));
+    String cacheKey = truncatedName + "|" + (unit == null || unit.isBlank() ? "1" : unit);
+    gaugeCache.computeIfAbsent(cacheKey, k ->
+        meter.gaugeBuilder(truncatedName)
+            .setUnit(unit == null || unit.isBlank() ? "1" : unit)
+            .buildWithCallback(measurement -> measurement.record(value, ab.build())));
   }
 
   public String[] span(
@@ -228,8 +237,7 @@ public class ObtraceClient implements AutoCloseable {
 
   @Override
   public void close() {
-    if (closed) return;
-    closed = true;
+    if (!closed.compareAndSet(false, true)) return;
     julHandler.uninstall();
     instrumentedHttpClient.close();
     sdk.close();
