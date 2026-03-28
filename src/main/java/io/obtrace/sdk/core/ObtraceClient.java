@@ -1,39 +1,33 @@
 package io.obtrace.sdk.core;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.obtrace.sdk.http.InstrumentedHttpClient;
 import io.obtrace.sdk.model.ObtraceConfig;
 import io.obtrace.sdk.model.ObtraceContext;
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.common.AttributesBuilder;
+import io.opentelemetry.api.logs.Logger;
+import io.opentelemetry.api.logs.Severity;
+import io.opentelemetry.api.metrics.Meter;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
 
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 public class ObtraceClient implements AutoCloseable {
   private final ObtraceConfig cfg;
-  private final HttpClient http;
-  private final ExecutorService executor;
-  private final Map<String, String> defaultHeaders;
-  private final ObjectMapper mapper = new ObjectMapper();
-  private final List<Queued> queue = new ArrayList<>();
-  private volatile boolean closed = false;
-  private final JulHandler julHandler;
+  private final OpenTelemetrySdk sdk;
+  private final Tracer tracer;
+  private final Meter meter;
+  private final Logger logger;
   private final InstrumentedHttpClient instrumentedHttpClient;
-  private int circuitFailures = 0;
-  private long circuitOpenUntil = 0;
-
-  private record Queued(String endpoint, Map<String, Object> payload) {}
+  private final JulHandler julHandler;
+  private volatile boolean closed = false;
 
   public ObtraceClient(ObtraceConfig cfg) {
     if (cfg.apiKey() == null || cfg.apiKey().isBlank()) throw new IllegalArgumentException("apiKey required");
@@ -41,17 +35,10 @@ public class ObtraceClient implements AutoCloseable {
     if (cfg.serviceName() == null || cfg.serviceName().isBlank()) throw new IllegalArgumentException("serviceName required");
 
     this.cfg = cfg;
-    this.defaultHeaders = cfg.defaultHeaders();
-    this.executor = Executors.newSingleThreadExecutor(r -> {
-      Thread t = new Thread(r, "obtrace-http");
-      t.setDaemon(true);
-      return t;
-    });
-    this.http = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofMillis(cfg.requestTimeoutMs() > 0 ? cfg.requestTimeoutMs() : 5000))
-        .executor(executor)
-        .build();
-
+    this.sdk = OtelSetup.initialize(cfg);
+    this.tracer = sdk.getTracer("obtrace-sdk-java", "1.0.0");
+    this.meter = sdk.getMeter("obtrace-sdk-java");
+    this.logger = sdk.getSdkLoggerProvider().get("obtrace-sdk-java");
     this.instrumentedHttpClient = new InstrumentedHttpClient(this);
 
     this.julHandler = new JulHandler(this);
@@ -70,23 +57,65 @@ public class ObtraceClient implements AutoCloseable {
     return new InstrumentedHttpClient(this, client);
   }
 
+  public Tracer getTracer() {
+    return tracer;
+  }
+
+  public Meter getMeter() {
+    return meter;
+  }
+
+  public Logger getLogger() {
+    return logger;
+  }
+
   private static String truncate(String s, int max) {
     if (s == null || s.length() <= max) return s;
     return s.substring(0, max) + "...[truncated]";
   }
 
-  public synchronized void log(String level, String message, ObtraceContext ctx) {
-    enqueue("/otlp/v1/logs", OtlpPayloads.logs(cfg, level, truncate(message, 32768), ctx));
+  public void log(String level, String message, ObtraceContext ctx) {
+    Severity severity = mapSeverity(level);
+    var builder = logger.logRecordBuilder()
+        .setSeverity(severity)
+        .setSeverityText(level.toUpperCase())
+        .setBody(truncate(message, 32768));
+
+    if (ctx != null) {
+      AttributesBuilder ab = Attributes.builder();
+      if (ctx.traceId != null) ab.put("obtrace.trace_id", ctx.traceId);
+      if (ctx.spanId != null) ab.put("obtrace.span_id", ctx.spanId);
+      if (ctx.sessionId != null) ab.put("obtrace.session_id", ctx.sessionId);
+      if (ctx.routeTemplate != null) ab.put("obtrace.route_template", ctx.routeTemplate);
+      if (ctx.endpoint != null) ab.put("obtrace.endpoint", ctx.endpoint);
+      if (ctx.method != null) ab.put("obtrace.method", ctx.method);
+      if (ctx.statusCode != null) ab.put("obtrace.status_code", (long) ctx.statusCode);
+      for (Map.Entry<String, Object> e : ctx.attrs.entrySet()) {
+        putAttribute(ab, "obtrace.attr." + e.getKey(), e.getValue());
+      }
+      builder.setAllAttributes(ab.build());
+    }
+
+    builder.emit();
   }
 
-  public synchronized void metric(String name, double value, String unit, ObtraceContext ctx) {
+  public void metric(String name, double value, String unit, ObtraceContext ctx) {
     if (cfg.validateSemanticMetrics() && cfg.debug() && !SemanticMetrics.isSemanticMetric(name)) {
       System.err.printf("[obtrace-sdk-java] non-canonical metric name: %s%n", name);
     }
-    enqueue("/otlp/v1/metrics", OtlpPayloads.metrics(cfg, truncate(name, 1024), value, unit, ctx));
+    String truncatedName = truncate(name, 1024);
+    AttributesBuilder ab = Attributes.builder();
+    if (ctx != null) {
+      for (Map.Entry<String, Object> e : ctx.attrs.entrySet()) {
+        putAttribute(ab, e.getKey(), e.getValue());
+      }
+    }
+    meter.gaugeBuilder(truncatedName)
+        .setUnit(unit == null || unit.isBlank() ? "1" : unit)
+        .buildWithCallback(measurement -> measurement.record(value, ab.build()));
   }
 
-  public synchronized String[] span(
+  public String[] span(
       String name,
       String traceId,
       String spanId,
@@ -97,7 +126,7 @@ public class ObtraceClient implements AutoCloseable {
     return span(name, traceId, spanId, null, statusCode, statusMessage, attrs);
   }
 
-  public synchronized String[] span(
+  public String[] span(
       String name,
       String traceId,
       String spanId,
@@ -106,64 +135,71 @@ public class ObtraceClient implements AutoCloseable {
       String statusMessage,
       Map<String, Object> attrs
   ) {
-    String t = traceId != null && traceId.length() == 32 ? traceId : Propagation.randomHex(16);
-    String s = spanId != null && spanId.length() == 16 ? spanId : Propagation.randomHex(8);
-    String p = parentSpanId != null && parentSpanId.length() == 16 ? parentSpanId : null;
-    Instant now = Instant.now();
-    long nanos = now.getEpochSecond() * 1_000_000_000L + now.getNano();
     String truncatedName = truncate(name, 32768);
+    var spanBuilder = tracer.spanBuilder(truncatedName)
+        .setSpanKind(SpanKind.CLIENT);
+
     if (attrs != null) {
-      attrs = new java.util.HashMap<>(attrs);
       for (Map.Entry<String, Object> e : attrs.entrySet()) {
-        if (e.getValue() instanceof String sv) {
-          e.setValue(truncate(sv, 4096));
+        Object v = e.getValue();
+        if (v instanceof String sv) {
+          spanBuilder.setAttribute(e.getKey(), truncate(sv, 4096));
+        } else if (v instanceof Boolean bv) {
+          spanBuilder.setAttribute(e.getKey(), bv);
+        } else if (v instanceof Long lv) {
+          spanBuilder.setAttribute(e.getKey(), lv);
+        } else if (v instanceof Number nv) {
+          spanBuilder.setAttribute(e.getKey(), nv.doubleValue());
+        } else {
+          spanBuilder.setAttribute(e.getKey(), String.valueOf(v));
         }
       }
     }
-    enqueue("/otlp/v1/traces", OtlpPayloads.spans(cfg, truncatedName, t, s, p, nanos, nanos, statusCode, statusMessage, attrs));
+
+    Span span = spanBuilder.startSpan();
+
+    if (statusCode != null && statusCode >= 400) {
+      span.setStatus(StatusCode.ERROR, statusMessage == null ? "" : statusMessage);
+    } else {
+      span.setStatus(StatusCode.OK, statusMessage == null ? "" : statusMessage);
+    }
+
+    span.end();
+
+    String t = span.getSpanContext().getTraceId();
+    String s = span.getSpanContext().getSpanId();
     return new String[]{t, s};
   }
 
-  public Map<String, String> injectPropagation(Map<String, String> headers, String traceId, String spanId, String sessionId) {
-    return Propagation.ensurePropagation(headers, traceId, spanId, sessionId, "traceparent", "x-obtrace-session-id");
+  public void captureError(Throwable throwable, Map<String, Object> attrs) {
+    var spanBuilder = tracer.spanBuilder("error")
+        .setSpanKind(SpanKind.INTERNAL);
+    if (attrs != null) {
+      for (Map.Entry<String, Object> e : attrs.entrySet()) {
+        Object v = e.getValue();
+        if (v instanceof String sv) {
+          spanBuilder.setAttribute(e.getKey(), sv);
+        } else if (v instanceof Boolean bv) {
+          spanBuilder.setAttribute(e.getKey(), bv);
+        } else if (v instanceof Long lv) {
+          spanBuilder.setAttribute(e.getKey(), lv);
+        } else if (v instanceof Number nv) {
+          spanBuilder.setAttribute(e.getKey(), nv.doubleValue());
+        } else {
+          spanBuilder.setAttribute(e.getKey(), String.valueOf(v));
+        }
+      }
+    }
+    Span span = spanBuilder.startSpan();
+    span.recordException(throwable);
+    span.setStatus(StatusCode.ERROR, throwable.getMessage() != null ? throwable.getMessage() : "error");
+    span.end();
   }
 
-  public synchronized void flush() {
-    long now = System.currentTimeMillis();
-    if (now < circuitOpenUntil) {
-      return;
-    }
-    boolean halfOpen = circuitFailures >= 5;
-    List<Queued> batch;
-    if (halfOpen) {
-      batch = queue.isEmpty() ? List.of() : List.of(queue.remove(0));
-    } else {
-      batch = new ArrayList<>(queue);
-      queue.clear();
-    }
-    long deadline = System.currentTimeMillis() + (cfg.flushTimeoutMs() > 0 ? cfg.flushTimeoutMs() : 30000);
-    for (Queued q : batch) {
-      if (System.currentTimeMillis() >= deadline) {
-        System.err.printf("[obtrace-sdk-java] flush timeout after %dms, %d items unsent%n", cfg.flushTimeoutMs(), batch.size() - batch.indexOf(q));
-        break;
-      }
-      if (send(q)) {
-        if (circuitFailures > 0 && cfg.debug()) {
-          System.err.println("[obtrace-sdk-java] circuit breaker closed");
-        }
-        circuitFailures = 0;
-        circuitOpenUntil = 0;
-      } else {
-        circuitFailures++;
-        if (circuitFailures >= 5) {
-          circuitOpenUntil = System.currentTimeMillis() + 30000;
-          if (cfg.debug()) {
-            System.err.println("[obtrace-sdk-java] circuit breaker opened");
-          }
-          break;
-        }
-      }
-    }
+  public void flush() {
+    sdk.getSdkTracerProvider().forceFlush().join(10, java.util.concurrent.TimeUnit.SECONDS);
+    sdk.getSdkMeterProvider().forceFlush().join(10, java.util.concurrent.TimeUnit.SECONDS);
+    sdk.getSdkLoggerProvider().forceFlush().join(10, java.util.concurrent.TimeUnit.SECONDS);
   }
 
   public void shutdown() {
@@ -177,54 +213,29 @@ public class ObtraceClient implements AutoCloseable {
     closed = true;
     julHandler.uninstall();
     instrumentedHttpClient.close();
-    executor.shutdown();
-    try {
-      if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-        executor.shutdownNow();
-      }
-    } catch (InterruptedException e) {
-      executor.shutdownNow();
-      Thread.currentThread().interrupt();
-    }
+    sdk.close();
   }
 
-  private void enqueue(String endpoint, Map<String, Object> payload) {
-    int max = cfg.maxQueueSize() > 0 ? cfg.maxQueueSize() : 1000;
-    if (queue.size() >= max) {
-      queue.remove(0);
-      System.err.printf("[obtrace-sdk-java] queue full (%d), dropping oldest telemetry item%n", max);
-    }
-    queue.add(new Queued(endpoint, payload));
+  private static Severity mapSeverity(String level) {
+    if (level == null) return Severity.INFO;
+    return switch (level.toLowerCase()) {
+      case "debug", "trace" -> Severity.DEBUG;
+      case "info" -> Severity.INFO;
+      case "warn", "warning" -> Severity.WARN;
+      case "error", "fatal" -> Severity.ERROR;
+      default -> Severity.INFO;
+    };
   }
 
-  private boolean send(Queued q) {
-    try {
-      String json = mapper.writeValueAsString(q.payload);
-      HttpRequest.Builder b = HttpRequest.newBuilder()
-          .uri(URI.create(cfg.ingestBaseUrl().replaceAll("/$", "") + q.endpoint))
-          .timeout(Duration.ofMillis(cfg.requestTimeoutMs() > 0 ? cfg.requestTimeoutMs() : 5000))
-          .header("Authorization", "Bearer " + cfg.apiKey())
-          .header("Content-Type", "application/json");
-      for (Map.Entry<String, String> h : defaultHeaders.entrySet()) {
-        b.header(h.getKey(), h.getValue());
-      }
-      HttpRequest req = b.POST(HttpRequest.BodyPublishers.ofString(json)).build();
-      HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
-      if (res.statusCode() >= 300) {
-        if (cfg.debug()) {
-          System.err.printf("[obtrace-sdk-java] status=%d endpoint=%s body=%s%n", res.statusCode(), q.endpoint, res.body());
-        }
-        return false;
-      }
-      return true;
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      return false;
-    } catch (IOException e) {
-      if (cfg.debug()) {
-        System.err.printf("[obtrace-sdk-java] send failed endpoint=%s err=%s%n", q.endpoint, e.getMessage());
-      }
-      return false;
+  private static void putAttribute(AttributesBuilder ab, String key, Object value) {
+    if (value instanceof Boolean b) {
+      ab.put(key, b);
+    } else if (value instanceof Long l) {
+      ab.put(key, l);
+    } else if (value instanceof Number n) {
+      ab.put(key, n.doubleValue());
+    } else {
+      ab.put(key, String.valueOf(value));
     }
   }
 }
