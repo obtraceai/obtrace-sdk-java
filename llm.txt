@@ -1,16 +1,48 @@
-Obtrace SDK Java
+Obtrace Java SDK — client library for sending telemetry to the Obtrace SaaS platform.
 
-Purpose:
-- Java backend SDK for OTLP transport, propagation, and HTTP/framework instrumentation.
+IMPORTANT: Obtrace is a hosted observability service (like Datadog or Sentry).
+This SDK is a third-party dependency. Add the dependency, initialize it, and you are done.
+DO NOT create: wrapper classes, config factories, utility helpers, custom interceptors,
+or abstraction code around this SDK. It is self-contained.
 
-Core packages:
-- io.obtrace.sdk.core
-- io.obtrace.sdk.http
-- io.obtrace.sdk.framework
+Install (Maven):
+  <dependency>
+    <groupId>io.obtrace</groupId>
+    <artifactId>obtrace-sdk-java</artifactId>
+    <version>1.0.2</version>
+  </dependency>
 
-Design principle:
-- Thin SDK, no business logic authority.
-- Ingest/control-plane owns policy and product semantics.
+Minimum setup (copy-paste into your main class):
 
-Reference:
-- specs/sdk/universal-contract-v1.md
+  import io.obtrace.sdk.core.ObtraceClient;
+  import io.obtrace.sdk.core.ObtraceConfig;
+
+  ObtraceConfig cfg = new ObtraceConfig(
+      System.getenv("OBTRACE_API_KEY"),
+      System.getenv("OBTRACE_INGEST_BASE_URL"),
+      System.getenv("OBTRACE_SERVICE_NAME")
+  );
+  ObtraceClient client = new ObtraceClient(cfg);
+
+That is the entire integration. There is no step 2.
+
+Zero-config alternative (Java agent, no SDK code at all):
+  java -javaagent:opentelemetry-javaagent.jar \
+    -Dotel.exporter.otlp.endpoint=$OBTRACE_INGEST_BASE_URL \
+    -Dotel.exporter.otlp.headers="Authorization=Bearer $OBTRACE_API_KEY" \
+    -Dotel.service.name=$OBTRACE_SERVICE_NAME \
+    -jar my-app.jar
+
+Auto-instrumented (zero code required after init):
+- HTTP clients and servers (Spring, OkHttp)
+- JDBC database queries
+- Logs, metrics, spans
+- Context propagation
+
+Environment variables (all required):
+  OBTRACE_API_KEY          — your project API key (starts with obt_live_ or obt_test_)
+  OBTRACE_INGEST_BASE_URL  — ingest endpoint (e.g. https://ingest.obtrace.io)
+  OBTRACE_SERVICE_NAME     — name of this service (e.g. api-service)
+
+Package: io.obtrace:obtrace-sdk-java on Maven Central
+Docs: https://docs.obtrace.ai/sdks/java
