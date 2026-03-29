@@ -46,7 +46,7 @@ public class ObtraceClient implements AutoCloseable {
 
     this.cfg = cfg;
     this.sdk = OtelSetup.initialize(cfg);
-    this.tracer = sdk.getTracer("obtrace-sdk-java", "1.0.0");
+    this.tracer = sdk.getTracer("obtrace-sdk-java", "2.0.0");
     this.meter = sdk.getMeter("obtrace-sdk-java");
     this.logger = sdk.getSdkLoggerProvider().get("obtrace-sdk-java");
     this.instrumentedHttpClient = new InstrumentedHttpClient(this);
@@ -65,7 +65,7 @@ public class ObtraceClient implements AutoCloseable {
     String base = cfg.ingestBaseUrl().replaceAll("/$", "");
     try {
       var body = String.format(
-          "{\"sdk\":\"obtrace-sdk-java\",\"sdk_version\":\"1.0.0\",\"service_name\":\"%s\",\"service_version\":\"%s\",\"runtime\":\"java\",\"runtime_version\":\"%s\"}",
+          "{\"sdk\":\"obtrace-sdk-java\",\"sdk_version\":\"2.0.0\",\"service_name\":\"%s\",\"service_version\":\"%s\",\"runtime\":\"java\",\"runtime_version\":\"%s\"}",
           cfg.serviceName(), cfg.serviceVersion(), Runtime.version().toString());
       var req = java.net.http.HttpRequest.newBuilder()
           .uri(java.net.URI.create(base + "/v1/init"))
