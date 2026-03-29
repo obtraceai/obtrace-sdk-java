@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.obtrace</groupId>
   <artifactId>obtrace-sdk-java</artifactId>
-  <version>1.2.0</version>
+  <version>1.2.1</version>
   <name>obtrace-sdk-java</name>
   <description>Obtrace Java SDK — observability for Java applications</description>
   <url>https://github.com/obtraceai/obtrace-sdk-java</url>
@@ -121,6 +121,9 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
         <version>3.11.2</version>
+        <configuration>
+          <doclint>none</doclint>
+        </configuration>
         <executions>
           <execution>
             <id>attach-javadocs</id>
