@@ -1,8 +1,8 @@
-package io.obtrace.sdk.core;
+package ai.obtrace.sdk.core;
 
-import io.obtrace.sdk.http.InstrumentedHttpClient;
-import io.obtrace.sdk.model.ObtraceConfig;
-import io.obtrace.sdk.model.ObtraceContext;
+import ai.obtrace.sdk.http.InstrumentedHttpClient;
+import ai.obtrace.sdk.model.ObtraceConfig;
+import ai.obtrace.sdk.model.ObtraceContext;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.common.AttributesBuilder;

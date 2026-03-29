@@ -5,13 +5,13 @@ Install it, add one init call, done. DO NOT create wrapper files or config modul
 
 Install (Maven):
   <dependency>
-    <groupId>io.obtrace</groupId>
+    <groupId>ai.obtrace</groupId>
     <artifactId>obtrace-sdk-java</artifactId>
     <version>1.0.2</version>
   </dependency>
 
 Setup (add to your main class):
-  import io.obtrace.sdk.core.*;
+  import ai.obtrace.sdk.core.*;
   ObtraceClient client = new ObtraceClient(new ObtraceConfig(
       System.getenv("OBTRACE_API_KEY"),
       System.getenv("OBTRACE_SERVICE_NAME")

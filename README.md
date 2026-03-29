@@ -17,7 +17,7 @@ SDK is thin/dumb.
 
 ```xml
 <dependency>
-  <groupId>io.obtrace</groupId>
+  <groupId>ai.obtrace</groupId>
   <artifactId>obtrace-sdk-java</artifactId>
   <version>1.0.2</version>
 </dependency>
@@ -112,7 +112,7 @@ ObtraceClient client = new ObtraceClient(cfg);
 For advanced use cases you can override the resolved values explicitly:
 
 ```java
-import io.obtrace.sdk.core.SemanticMetrics;
+import ai.obtrace.sdk.core.SemanticMetrics;
 import java.util.Map;
 
 ObtraceConfig cfg = ObtraceConfig.builder()

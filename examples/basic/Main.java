@@ -1,6 +1,6 @@
-import io.obtrace.sdk.core.ObtraceClient;
-import io.obtrace.sdk.core.SemanticMetrics;
-import io.obtrace.sdk.model.ObtraceConfig;
+import ai.obtrace.sdk.core.ObtraceClient;
+import ai.obtrace.sdk.core.SemanticMetrics;
+import ai.obtrace.sdk.model.ObtraceConfig;
 
 import java.util.Map;
 

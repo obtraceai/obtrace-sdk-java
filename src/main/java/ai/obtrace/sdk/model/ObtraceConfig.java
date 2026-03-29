@@ -1,4 +1,4 @@
-package io.obtrace.sdk.model;
+package ai.obtrace.sdk.model;
 
 import java.util.Collections;
 import java.util.HashMap;

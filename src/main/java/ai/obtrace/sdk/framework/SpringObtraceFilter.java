@@ -1,6 +1,6 @@
-package io.obtrace.sdk.framework;
+package ai.obtrace.sdk.framework;
 
-import io.obtrace.sdk.core.ObtraceClient;
+import ai.obtrace.sdk.core.ObtraceClient;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;

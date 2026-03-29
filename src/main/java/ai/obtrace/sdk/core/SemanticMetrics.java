@@ -1,4 +1,4 @@
-package io.obtrace.sdk.core;
+package ai.obtrace.sdk.core;
 
 import java.util.Set;
 

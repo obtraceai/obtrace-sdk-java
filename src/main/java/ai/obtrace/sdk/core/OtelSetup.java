@@ -1,6 +1,6 @@
-package io.obtrace.sdk.core;
+package ai.obtrace.sdk.core;
 
-import io.obtrace.sdk.model.ObtraceConfig;
+import ai.obtrace.sdk.model.ObtraceConfig;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.exporter.otlp.http.logs.OtlpHttpLogRecordExporter;
 import io.opentelemetry.exporter.otlp.http.metrics.OtlpHttpMetricExporter;
