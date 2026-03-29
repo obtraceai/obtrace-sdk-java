@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.obtrace</groupId>
   <artifactId>obtrace-sdk-java</artifactId>
-  <version>1.0.2</version>
+  <version>1.0.0</version>
   <name>obtrace-sdk-java</name>
   <description>Obtrace Java SDK — observability for Java applications</description>
   <url>https://github.com/obtraceai/obtrace-sdk-java</url>

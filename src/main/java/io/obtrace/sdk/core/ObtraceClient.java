@@ -33,6 +33,9 @@ public class ObtraceClient implements AutoCloseable {
   private final JulHandler julHandler;
   private final AtomicBoolean closed = new AtomicBoolean(false);
   private final ConcurrentHashMap<String, Object> gaugeCache = new ConcurrentHashMap<>();
+  private volatile boolean initialized = false;
+
+  public boolean isInitialized() { return initialized; }
 
   public ObtraceClient(ObtraceConfig cfg) {
     if (!INSTANCE_CREATED.compareAndSet(false, true)) {
@@ -54,6 +57,34 @@ public class ObtraceClient implements AutoCloseable {
 
     if (cfg.registerShutdownHook()) {
       Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "obtrace-shutdown"));
+    }
+
+    Thread.ofVirtual().name("obtrace-init").start(this::handshake);
+  }
+
+  private void handshake() {
+    String base = cfg.ingestBaseUrl().replaceAll("/$", "");
+    try {
+      var body = String.format(
+          "{\"sdk\":\"obtrace-sdk-java\",\"sdk_version\":\"1.0.0\",\"service_name\":\"%s\",\"service_version\":\"%s\",\"runtime\":\"java\",\"runtime_version\":\"%s\"}",
+          cfg.serviceName(), cfg.serviceVersion(), Runtime.version().toString());
+      var req = java.net.http.HttpRequest.newBuilder()
+          .uri(java.net.URI.create(base + "/v1/init"))
+          .header("Content-Type", "application/json")
+          .header("Authorization", "Bearer " + cfg.apiKey())
+          .timeout(java.time.Duration.ofSeconds(5))
+          .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body))
+          .build();
+      var resp = java.net.http.HttpClient.newHttpClient()
+          .send(req, java.net.http.HttpResponse.BodyHandlers.discarding());
+      if (resp.statusCode() == 200) {
+        initialized = true;
+        if (cfg.debug()) System.out.println("[obtrace-sdk-java] init handshake OK");
+      } else if (cfg.debug()) {
+        System.err.printf("[obtrace-sdk-java] init handshake failed: %d%n", resp.statusCode());
+      }
+    } catch (Exception e) {
+      if (cfg.debug()) System.err.println("[obtrace-sdk-java] init handshake error: " + e.getMessage());
     }
   }
 
