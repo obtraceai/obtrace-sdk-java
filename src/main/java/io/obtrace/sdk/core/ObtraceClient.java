@@ -66,7 +66,7 @@ public class ObtraceClient implements AutoCloseable {
     String base = cfg.ingestBaseUrl().replaceAll("/$", "");
     try {
       var body = String.format(
-          "{\"sdk\":\"obtrace-sdk-java\",\"sdk_version\":\"1.0.1\",\"service_name\":\"%s\",\"service_version\":\"%s\",\"runtime\":\"java\",\"runtime_version\":\"%s\"}",
+          "{\"sdk\":\"obtrace-sdk-java\",\"sdk_version\":\"1.0.2\",\"service_name\":\"%s\",\"service_version\":\"%s\",\"runtime\":\"java\",\"runtime_version\":\"%s\"}",
           cfg.serviceName(), cfg.serviceVersion(), Runtime.version().toString());
       var req = java.net.http.HttpRequest.newBuilder()
           .uri(java.net.URI.create(base + "/v1/init"))
