@@ -68,7 +68,7 @@ jobs:
           echo "/tmp/apache-maven-3.9.9/bin" >> "$GITHUB_PATH"
       - name: Set Maven version
         run: mvn versions:set -DnewVersion=${{ steps.version.outputs.version }} -DgenerateBackupPoms=false
-      - run: mvn clean deploy -DskipTests
+      - run: mvn clean deploy -DskipTests -e
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
