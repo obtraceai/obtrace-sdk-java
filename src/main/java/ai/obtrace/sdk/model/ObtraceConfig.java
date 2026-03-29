@@ -61,7 +61,7 @@ public final class ObtraceConfig {
 
   public static final class Builder {
     private String apiKey;
-    private String ingestBaseUrl;
+    private String ingestBaseUrl = "https://ingest.obtrace.ai";
     private String serviceName;
     private String serviceVersion = "0.0.0";
     private String tenantId;

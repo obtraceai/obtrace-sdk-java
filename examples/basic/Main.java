@@ -8,7 +8,6 @@ public class Main {
   public static void main(String[] args) {
     ObtraceConfig cfg = ObtraceConfig.builder()
         .apiKey("devkey")
-        .ingestBaseUrl("https://inject.obtrace.ai")
         .serviceName("java-example")
         .tenantId("tenant-dev")
         .projectId("project-dev")

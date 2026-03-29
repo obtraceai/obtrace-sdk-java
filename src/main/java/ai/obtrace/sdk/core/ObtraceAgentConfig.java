@@ -6,16 +6,22 @@ public final class ObtraceAgentConfig {
 
     private ObtraceAgentConfig() {}
 
+    private static final String DEFAULT_INGEST_BASE_URL = "https://ingest.obtrace.ai";
+
+    public static String jvmArgs(String apiKey, String serviceName) {
+        return jvmArgs(apiKey, DEFAULT_INGEST_BASE_URL, serviceName, DEFAULT_AGENT_JAR);
+    }
+
     public static String jvmArgs(String apiKey, String ingestBaseUrl, String serviceName) {
         return jvmArgs(apiKey, ingestBaseUrl, serviceName, DEFAULT_AGENT_JAR);
     }
 
     public static String jvmArgs(String apiKey, String ingestBaseUrl, String serviceName, String agentJarPath) {
         if (apiKey == null || apiKey.isBlank()) throw new IllegalArgumentException("apiKey required");
-        if (ingestBaseUrl == null || ingestBaseUrl.isBlank()) throw new IllegalArgumentException("ingestBaseUrl required");
         if (serviceName == null || serviceName.isBlank()) throw new IllegalArgumentException("serviceName required");
 
-        String endpoint = ingestBaseUrl.endsWith("/") ? ingestBaseUrl.substring(0, ingestBaseUrl.length() - 1) : ingestBaseUrl;
+        String effectiveUrl = (ingestBaseUrl == null || ingestBaseUrl.isBlank()) ? DEFAULT_INGEST_BASE_URL : ingestBaseUrl;
+        String endpoint = effectiveUrl.endsWith("/") ? effectiveUrl.substring(0, effectiveUrl.length() - 1) : effectiveUrl;
 
         return String.join(" ",
             "-javaagent:" + agentJarPath,

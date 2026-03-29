@@ -39,10 +39,10 @@ mvn -q -DskipTests package
 
 Required:
 - `apiKey`
-- `ingestBaseUrl`
 - `serviceName`
 
 Optional (auto-resolved from API key on the server side):
+- `ingestBaseUrl` (defaults to `https://ingest.obtrace.ai`)
 - `tenantId`
 - `projectId`
 - `appId`
@@ -72,7 +72,6 @@ Or generate the JVM args programmatically:
 ```java
 String args = ObtraceAgentConfig.jvmArgs(
     "obt_live_...",
-    "https://ingest.obtrace.ai",
     "my-service"
 );
 ```
@@ -82,7 +81,6 @@ Or get the equivalent environment variables from a config object:
 ```java
 ObtraceConfig cfg = ObtraceConfig.builder()
     .apiKey("obt_live_...")
-    .ingestBaseUrl("https://ingest.obtrace.ai")
     .serviceName("my-service")
     .build();
 
@@ -95,12 +93,11 @@ Map<String, String> env = ObtraceClient.otelEnvironmentVars(cfg);
 
 ### Simplified setup
 
-The API key resolves `tenant_id`, `project_id`, `app_id`, and `env` automatically on the server side, so only three fields are needed:
+The API key resolves `tenant_id`, `project_id`, `app_id`, and `env` automatically on the server side, so only two fields are needed:
 
 ```java
 ObtraceConfig cfg = ObtraceConfig.builder()
     .apiKey("obt_live_...")
-    .ingestBaseUrl("https://ingest.obtrace.ai")
     .serviceName("my-service")
     .build();
 
@@ -117,7 +114,6 @@ import java.util.Map;
 
 ObtraceConfig cfg = ObtraceConfig.builder()
     .apiKey("<API_KEY>")
-    .ingestBaseUrl("https://ingest.obtrace.ai")
     .serviceName("java-api")
     .build();
 

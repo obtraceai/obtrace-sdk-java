@@ -42,7 +42,6 @@ public class ObtraceClient implements AutoCloseable {
       System.err.println("[obtrace-sdk-java] WARNING: ObtraceClient created more than once. Use a single instance.");
     }
     if (cfg.apiKey() == null || cfg.apiKey().isBlank()) throw new IllegalArgumentException("apiKey required");
-    if (cfg.ingestBaseUrl() == null || cfg.ingestBaseUrl().isBlank()) throw new IllegalArgumentException("ingestBaseUrl required");
     if (cfg.serviceName() == null || cfg.serviceName().isBlank()) throw new IllegalArgumentException("serviceName required");
 
     this.cfg = cfg;
@@ -90,7 +89,6 @@ public class ObtraceClient implements AutoCloseable {
 
   public static Map<String, String> otelEnvironmentVars(ObtraceConfig config) {
     if (config.apiKey() == null || config.apiKey().isBlank()) throw new IllegalArgumentException("apiKey required");
-    if (config.ingestBaseUrl() == null || config.ingestBaseUrl().isBlank()) throw new IllegalArgumentException("ingestBaseUrl required");
     if (config.serviceName() == null || config.serviceName().isBlank()) throw new IllegalArgumentException("serviceName required");
 
     String endpoint = config.ingestBaseUrl();
