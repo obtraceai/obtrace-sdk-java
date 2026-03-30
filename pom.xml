@@ -35,7 +35,7 @@
     <maven.compiler.target>17</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <opentelemetry.version>1.35.0</opentelemetry.version>
-    <opentelemetry.semconv.version>1.23.1-alpha</opentelemetry.semconv.version>
+    <opentelemetry.semconv.version>1.40.0</opentelemetry.semconv.version>
   </properties>
 
   <dependencyManagement>
